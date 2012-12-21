@@ -39,12 +39,17 @@ class Connection(threading.Thread):
     # Get the header first.
     header = self.socket.recv(protocol.HEADER_SIZE)
 
-    size = protocol.length_of(received)
-    msg = self.socket.recv(size - len(msg))
+    size = protocol.packet_length(header)
+    msg = ""
+    while len(msg) < size:
+      received = self.socket.recv(size)
+      msg += received
+      if len(received) == 0:
+        self.logger.warning("Server socket died while receiving.")
     return protocol.parse(header, msg)
 
   def run(self):
     while True:
       msg = self.recv_()  # Blocking.
-      print msg.SerializeToString() + "\n"
+      print str(type(msg)), msg
 
