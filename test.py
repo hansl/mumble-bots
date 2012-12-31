@@ -1,14 +1,11 @@
 #!/bin/python
 import logging
 import sys
+import threading
 import time
 
+import bots
 import mumble
-
-class TestBot(mumble.Bot):
-  def __init__(self, server):
-    mumble.Bot.__init__(self, server, ".Bot", "TestBot 2000")
-
 
 def main(argv):
   logging.basicConfig(format='%(asctime)s %(message)s')
@@ -16,7 +13,7 @@ def main(argv):
 
   print "Ping: " + str(s.ping())
 
-  b = TestBot(s)
+  b = bots.EchoBot(s)
   b.connection.join()
 
 if __name__ == '__main__':

@@ -72,6 +72,16 @@ def ping(timestamp = None):
   msg.timestamp = timestamp
   return serialize_(msg)
 
+def text_message(actor = None, session = None, channels = None, tree = None,
+                 message = None):
+  msg = mumble_pb2.TextMessage()
+  if actor: msg.actor = actor
+  if session: msg.session.extend(session)
+  if channels: msg.channel_id.extend(channels)
+  if tree: msg.tree_id.extend(tree)
+  if message: msg.message = message
+  return serialize_(msg)
+
 # Analyze Packets.
 def packet_length(header):
   return struct.unpack(HEADER_FORMAT, header)[1]

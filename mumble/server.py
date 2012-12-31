@@ -34,6 +34,7 @@ class Server(object):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(1)
     buf = struct.pack(">iQ", 0, datetime.datetime.now().microsecond)
+    print self.hostname, self.port
     s.sendto(buf, (self.hostname, self.port))
     try:
       data, addr = s.recvfrom(1024)

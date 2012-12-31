@@ -41,6 +41,9 @@ class Connection(threading.Thread):
     self.last_ping = int(time.time() * 1000.0)
     self._send(protocol.ping(int(self.last_ping)))
 
+  def send_message(self, message, destination = None):
+    self._send(protocol.text_message(session = [destination], message = message))
+
   # Private. Send the queue.
   def _send_queue(self):
     self.mutex.acquire()
@@ -96,10 +99,8 @@ class Connection(threading.Thread):
 
   # Private.
   def _call(self, attr, *kargs):
-    print "attr: " + attr + str(kargs)
     if self.delegate:
       func = getattr(self.delegate, attr)
-      print "      " + str(func)
       if func:
         func(*kargs)
 
@@ -148,7 +149,7 @@ class Connection(threading.Thread):
     if self.last_ping != msg.timestamp:
       LOGGER.warning("Last ping time didn't correspond to expected time.")
     # Force a ping every 10 seconds (more than enough).
-    rtt = msg.timestamp - time.time() * 1000.0
+    rtt = time.time() * 1000.0 - msg.timestamp
     self.next_ping = time.time() + 10
     self._call("on_pingback", rtt, msg.good, msg.late, msg.lost,
                               msg.udp_packets, msg.udp_ping_avg,
@@ -170,6 +171,10 @@ class Connection(threading.Thread):
     self._call("on_channel_state", msg.channel_id, msg.parent,
                                    msg.name, msg.links, msg.description,
                                    msg.temporary, msg.position)
+
+  def _on_text_message(self, msg):
+    self._call("on_text_message", msg.actor, msg.session, msg.channel_id,
+                                  msg.tree_id, msg.message)
 
   def _on_crypt_setup(self, msg):
     self._call("on_crypt_setup", msg.key, msg.client_nonce, msg.server_nonce)
@@ -194,7 +199,7 @@ class Connection(threading.Thread):
       # mumble_pb2.UserRemove: self._on_user_remove,
       # mumble_pb2.UserState: self._on_user_state,
       # mumble_pb2.BanList: self._on_ban_list,
-      # mumble_pb2.TextMessage: self._on_text_message,
+      mumble_pb2.TextMessage: self._on_text_message,
       # mumble_pb2.PermissionDenied: self._on_permission_denied,
       # mumble_pb2.ACL: self._on_acl,
       # mumble_pb2.QueryUsers: self._on_query_users,
