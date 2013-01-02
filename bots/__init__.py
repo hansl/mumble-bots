@@ -1,2 +1,2 @@
-#!/bin/python
 from echo import EchoBot
+from interactive import InteractiveBot

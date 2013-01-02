@@ -42,8 +42,10 @@ class Connection(threading.Thread):
     self._send(protocol.ping(int(self.last_ping)))
 
   def send_message(self, message, destination = None):
-    self._send(protocol.text_message(session = [destination], message = message))
+    self._send(protocol.text_message(session = [destination],
+                                     message = message))
 
+  ##############################################################################
   # Private. Send the queue.
   def _send_queue(self):
     self.mutex.acquire()
@@ -100,7 +102,7 @@ class Connection(threading.Thread):
   # Private.
   def _call(self, attr, *kargs):
     if self.delegate:
-      func = getattr(self.delegate, attr)
+      func = getattr(self.delegate, attr, None)
       if func:
         func(*kargs)
 
@@ -220,11 +222,15 @@ class Connection(threading.Thread):
     while self.keep_going:
       # Read...
       try:
-        r, _, err = select.select([fd], [], [], 1)
-      except:
+        r, _, err = select.select([fd], [], [fd], 1)
+      except socket.error as msg:
+        self._call("on_socket_exception", msg)
+        self.stop()
         return False
       for n in err:
         if n == fd:
+          self._call("on_socket_error")
+          self.stop()
           return False
       for n in r:
         if n == fd:
@@ -235,6 +241,7 @@ class Connection(threading.Thread):
       # seconds.
       if self.next_ping and time.time() >= self.next_ping:
         self.ping()
+    return True
 
   def run(self):
     self._loop()

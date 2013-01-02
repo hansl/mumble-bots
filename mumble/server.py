@@ -13,7 +13,7 @@ LOGGER = logging.getLogger(__name__)
 class Server(object):
   def __init__(self, hostname = '', port = 64738):
     self.hostname = hostname
-    self.port = port
+    self.port = int(port)
 
   def connect(self):
     sc = ssl.wrap_socket(socket.socket(type = socket.SOCK_STREAM),

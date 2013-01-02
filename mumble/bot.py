@@ -102,20 +102,33 @@ class BotState(object):
 # keep the bot state. It also builds the BotState for the connection for you,
 # so you don't have to (ain't that nice).
 class Bot(object):
-  def __init__(self, server, nickname, name = "MumbleBot 2000"):
+  def __init__(self, version = "HansBot"):
+    self.version = "HansBot"
     self.state = BotState(self)
-    self.user_id = None
-    self.connection = Connection(server, nickname, delegate = self.state)
+    self.connection = None
+
+  def start(self, server, nickname):
+    if self.connection:
+      LOGGER.warning("Starting the bot twice. Will disconnect old bot.")
+      self.stop()
+    self.connection = Connection(server, nickname, delegate = self.state,
+                                 version = self.version)
+
+  def join(self):
+    self.connection.join()
 
   def send_message(self, destination, message):
     self.connection.send_message(destination = destination, message = message)
 
-  def rejected(self):
+  def stop(self):
     self.connection.stop()
+    self.connection = None
+
+  def rejected(self):
+    self.stop()
 
   def ready(self):
-    self.debug_output()
-    print self.state.permissions
+    pass
 
   ### EVENTS FROM STATE
   def on_text_message(self, from_id, user_ids, channel_ids, tree_ids, message):
@@ -140,10 +153,4 @@ class Bot(object):
     pass
   def on_message_trees(self, from_id, tree_ids, message):
     pass
-
-  def debug_output(self, chan = None, level = 0):
-    if chan is None: chan = self.state.root
-    print "%s. '%s' (%d)" % ("  " * level, chan.name, 0)
-    for x in chan.children:
-      self.debug_output(chan.children[x], level + 1)
 
