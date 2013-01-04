@@ -23,9 +23,9 @@ class Connection(threading.Thread):
     self.nickname = nickname
     self.password = password
     self.keep_going = True
-    self.queue = ""
     self.next_ping = None
     self.last_ping = None
+    self.is_pinging = False
     self.mutex = thread.allocate_lock()
 
     threading.Thread.__init__(self)
@@ -38,22 +38,28 @@ class Connection(threading.Thread):
     self.keep_going = False
 
   def ping(self):
-    self.last_ping = int(time.time() * 1000.0)
+    self.mutex.acquire()
+    try:
+      if self.is_pinging:
+        return
+      self.is_pinging = True
+      self.last_ping = int(time.time() * 1000.0)
+    finally:
+      self.mutex.release()
     self._send(protocol.ping(int(self.last_ping)))
 
   def send_message(self, message, destination = None):
     self._send(protocol.text_message(session = [destination],
                                      message = message))
 
-  ##############################################################################
-  # Private. Send the queue.
-  def _send_queue(self):
-    self.mutex.acquire()
-    msg = self.queue
-    self.queue = ""
-    self.mutex.release()
-    return self._send_blocking(msg)
+  def ask_texture_for_user(self, session_id):
+    self._send(protocol.request_blob([sessions_id], None, None))
+  def ask_comment_for_user(self, session_id):
+    self._send(protocol.request_blob(None, [session_id], None))
+  def ask_description_for_channel(self, channel_id):
+    self._send(protocol.request_blob(None, None, [channel_id]))
 
+  ##############################################################################
   # Private.
   def _send(self, msg):
     self._send_blocking(msg)
@@ -73,7 +79,6 @@ class Connection(threading.Thread):
       self.mutex.release()
     return True
 
-  # Private.
   def _recv(self):
     # Get the header first.
     try:
@@ -99,13 +104,15 @@ class Connection(threading.Thread):
         return None
     return protocol.parse(header, msg)
 
-  # Private.
+  # Call a delegate method named 'attr' with the args in kwargs.
   def _call(self, attr, *kargs):
     if self.delegate:
       func = getattr(self.delegate, attr, None)
       if func:
         func(*kargs)
 
+  # Call a delegate method named 'attr' for all messages in the
+  # voice packet.
   def _call_voice(self, attr, msg, session, sequence):
     pos = 0
     while ord(msg[pos]) & 0b10000000 != 0:
@@ -116,12 +123,15 @@ class Connection(threading.Thread):
       sz = msg[pos]
       self._call(attr, sequence, msg[pos:pos + sz])
 
+  ##############################################################################
+  # The different message handlers. These delegate for handling it.
   def _on_version(self, msg):
-    self._call("on_version", msg.version, msg.release, msg.os, msg.os_version)
     # Handshake
     self._send(protocol.version(self.name))
     # Continue the handshake
     self._send(protocol.authenticate(self.nickname, self.password))
+    # Callback at the end.
+    self._call("on_version", msg)
 
   def _on_udp_tunnel(self, msg):
     if not self.delegate:
@@ -148,43 +158,46 @@ class Connection(threading.Thread):
     pass
 
   def _on_ping(self, msg):
-    if self.last_ping != msg.timestamp:
-      LOGGER.warning("Last ping time didn't correspond to expected time.")
-    # Force a ping every 10 seconds (more than enough).
-    rtt = time.time() * 1000.0 - msg.timestamp
-    self.next_ping = time.time() + 10
-    self._call("on_pingback", rtt, msg.good, msg.late, msg.lost,
-                              msg.udp_packets, msg.udp_ping_avg,
-                              msg.udp_ping_var)
+    rtt = -1
+    self.mutex.acquire()
+    try:
+      self.is_pinging = False
+      if self.last_ping != msg.timestamp:
+        LOGGER.warning(
+            "Last ping (%d) time didn't correspond to expected time (%d)."
+            % (msg.timestamp, self.last_ping))
+      # Force a ping every 10 seconds (more than enough).
+      rtt = time.time() * 1000.0 - msg.timestamp
+      self.next_ping = time.time() + 10
+    finally:
+      self.mutex.release()
+    self._call("on_pingback", rtt, msg)
 
   def _on_reject(self, msg):
-    self._call("on_reject", msg.type, msg.reason)
+    self._call("on_reject", msg)
 
   def _on_server_config(self, msg):
-    # max_bandwidth is already sent through server sync.
-    self._call("on_server_config", msg.welcome_text, msg.allow_html,
-                                   msg.message_length, msg.image_message_length)
+    self._call("on_server_config", msg)
 
   def _on_server_sync(self, msg):
-    self._call("on_server_sync", msg.session, msg.max_bandwidth,
-                                 msg.welcome_text, msg.permissions)
+    self._call("on_server_sync", msg)
 
   def _on_channel_state(self, msg):
-    self._call("on_channel_state", msg.channel_id, msg.parent,
-                                   msg.name, msg.links, msg.description,
-                                   msg.temporary, msg.position)
+    self._call("on_channel_state", msg)
+
+  def _on_user_state(self, msg):
+    self._call("on_user_state", msg)
 
   def _on_text_message(self, msg):
-    self._call("on_text_message", msg.actor, msg.session, msg.channel_id,
-                                  msg.tree_id, msg.message)
+    self._call("on_text_message", msg)
 
   def _on_crypt_setup(self, msg):
-    self._call("on_crypt_setup", msg.key, msg.client_nonce, msg.server_nonce)
+    self._call("on_crypt_setup", msg)
     # Start pinging.
     self.ping()
 
   def _on_unknown(self, msg):
-    self._call("on_unknown", type(msg), str(msg))
+    self._call("on_unknown", type(msg), msg)
 
   def _switch(self, msg):
     if msg == None:
@@ -199,7 +212,7 @@ class Connection(threading.Thread):
       # mumble_pb2.ChannelRemove: self._on_channel_remove,
       mumble_pb2.ChannelState: self._on_channel_state,
       # mumble_pb2.UserRemove: self._on_user_remove,
-      # mumble_pb2.UserState: self._on_user_state,
+      mumble_pb2.UserState: self._on_user_state,
       # mumble_pb2.BanList: self._on_ban_list,
       mumble_pb2.TextMessage: self._on_text_message,
       # mumble_pb2.PermissionDenied: self._on_permission_denied,
@@ -222,7 +235,7 @@ class Connection(threading.Thread):
     while self.keep_going:
       # Read...
       try:
-        r, _, err = select.select([fd], [], [fd], 1)
+        r, _, err = select.select([fd], [], [fd], 0.3)
       except socket.error as msg:
         self._call("on_socket_exception", msg)
         self.stop()

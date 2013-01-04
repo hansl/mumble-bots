@@ -69,7 +69,7 @@ def authenticate(username, password = None, tokens = None, celt_versions = None,
 
 def ping(timestamp = None):
   msg = mumble_pb2.Ping()
-  msg.timestamp = timestamp
+  if timestamp: msg.timestamp = timestamp
   return serialize_(msg)
 
 def text_message(actor = None, session = None, channels = None, tree = None,
@@ -80,6 +80,13 @@ def text_message(actor = None, session = None, channels = None, tree = None,
   if channels: msg.channel_id.extend(channels)
   if tree: msg.tree_id.extend(tree)
   if message: msg.message = message
+  return serialize_(msg)
+
+def request_blob(texture = None, comment = None, description = None):
+  msg = mumble_pb2.RequestBlob()
+  if texture: msg.session_texture.extend(texture)
+  if comment: msg.session_comment.extend(comment)
+  if description: msg.channel_description.extend(description)
   return serialize_(msg)
 
 # Analyze Packets.

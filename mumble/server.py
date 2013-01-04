@@ -15,6 +15,9 @@ class Server(object):
     self.hostname = hostname
     self.port = int(port)
 
+  def __str__(self):
+    return "%s:%d" % (self.hostname, self.port)
+
   def connect(self):
     sc = ssl.wrap_socket(socket.socket(type = socket.SOCK_STREAM),
                                        ssl_version = ssl.PROTOCOL_TLSv1)
@@ -34,7 +37,6 @@ class Server(object):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.settimeout(1)
     buf = struct.pack(">iQ", 0, datetime.datetime.now().microsecond)
-    print self.hostname, self.port
     s.sendto(buf, (self.hostname, self.port))
     try:
       data, addr = s.recvfrom(1024)

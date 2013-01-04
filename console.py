@@ -8,7 +8,6 @@ import bots
 import mumble
 
 def main(argv):
-  # logging.basicConfig(format = '%(asctime)s<%(module)s> %(message)s')
   c = bots.InteractiveBot()
   c.interact()
 

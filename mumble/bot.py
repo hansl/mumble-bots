@@ -5,6 +5,7 @@ import logging
 from channel import Channel
 from connection import Connection
 from permissions import Permissions
+from user import User
 
 LOGGER = logging.getLogger(__name__)
 
@@ -16,17 +17,20 @@ class BotState(object):
   def __init__(self, bot):
     self.bot = bot
     self.channels_by_id = {}
+    self.users_by_session = {}
+    self.users_by_id = {}
     self.root = None
-    # Queue is used if we list channels without a parent. When the parent is
-    # added, we add all its children from the queue.
-    self._chan_queue = []
     self.permissions = None
+    # The user object representing the bot.
+    self.user = None
+    # The current channel the bot is in.
+    self.channel = None
 
-  def on_version(self, version, release, os, os_version):
-    self.version = version
-    self.release = release
-    self.os = os
-    self.os_version = os_version
+  def on_version(self, msg):
+    self.version = msg.version
+    self.release = msg.release
+    self.os = msg.os
+    self.os_version = msg.os_version
 
   # We do not support voice right now.
   def on_voice_ping(self, session_id):
@@ -38,65 +42,81 @@ class BotState(object):
   def on_voice_whisper_self(self, from_id, sequence, data):
     pass
 
-  def on_pingback(self, ping_msec, good, late, lost, udp_packets, udp_ping_avg,
-                        udp_ping_var):
+  def on_pingback(self, ping_msec, msg):
     self.ping = ping_msec
-    self.packet_stats = (good, late, lost)
-    self.udp_stats = (udp_packets, udp_ping_avg, udp_ping_var)
+    self.packet_stats = (msg.good, msg.late, msg.lost)
+    self.udp_stats = (msg.udp_packets, msg.udp_ping_avg, msg.udp_ping_var)
 
-  def on_reject(self, type, reason):
+  def on_reject(self, msg):
     self.rejected = True
-    self.reject_type = type
-    self.reject_rease = reason
+    self.reject_type = msg.type
+    self.reject_reason = msg.reason
     self.bot.rejected()
 
-  def on_server_config(self, welcome_text, allow_html, message_length,
-                             image_message_length):
-    self.welcome_text = welcome_text
-    self.allow_html = allow_html
+  def on_server_config(self, msg):
+    self.welcome_text = msg.welcome_text
+    self.allow_html = msg.allow_html
 
-  def on_server_sync(self, session_id, max_bandwidth, welcome_text,
-                           permissions):
-    self.session_id = session_id
-    self.max_bandwidth = max_bandwidth
-    self.welcome_text = welcome_text
-    if not self.permissions:
-      self.permissions = Permissions(permissions)
+  def on_server_sync(self, msg):
+    self.session_id = msg.session
+    self.max_bandwidth = msg.max_bandwidth
+    self.welcome_text = msg.welcome_text
+    if msg.permissions:
+      if not self.permissions:
+        self.permissions = Permissions(msg.permissions)
+      else:
+        self.permissions.update(msg.permissions)
+    self.bot.connected()
+
+  def on_channel_state(self, msg):
+    if msg.channel_id not in self.channels_by_id:
+      chan = Channel(self.bot, msg.channel_id)
+      self.channels_by_id[msg.channel_id] = chan
     else:
-      self.permissions.update(permissions)
-    self.bot.ready()
+      chan = self.channels_by_id[msg.channel_id]
+    chan.update(msg)
 
-  def on_channel_state(self, channel_id, parent_id, name, links, description,
-                             is_temporary, position):
-    if channel_id not in self.channels_by_id:
-      chan = Channel(channel_id)
-      self.channels_by_id[channel_id] = chan
-    else:
-      chan = self.channels_by_id[channel_id]
-    chan.update(name, description, is_temporary, position)
-
-    if parent_id == channel_id:
-      if self.root is not None and self.root != chan:
+    if msg.parent == msg.channel_id:
+      if not msg.channel_id == 0:
+        LOGGER.warning('Root channel not ID 0.')
+      if self.root and self.root != chan:
         LOGGER.error('Received 2 different roots...?')
         raise Exception('Two roots.')
       self.root = chan
     elif chan.parent:
-      if chan.parent.id != parent_id:
+      if chan.parent.id != msg.parent:
         chan.parent.remove_child(chan)
-        self.channels_by_id[parent_id].add_child(chan)
+        self.channels_by_id[msg.parent].add_child(chan)
     else:
-      self.channels_by_id[parent_id].add_child(chan)
+      if not msg.parent in self.channels_by_id:
+        LOGGER.error('Parent ID passed by server is not in the channel list.')
+        raise Exception('Invalid Parent.')
+      self.channels_by_id[msg.parent].add_child(chan)
+    print msg
 
-  def on_text_message(self, from_id, to, channels, trees, message):
-    self.bot.on_text_message(from_id = from_id, user_ids = to,
-                             channel_ids = channels, tree_ids = trees,
-                             message = message)
+  def on_user_state(self, msg):
+    if msg.session not in self.users_by_session:
+      user = User(self.bot, msg.session)
+      self.users_by_session[msg.session] = user
+      if msg.user_id is not None:
+        self.users_by_id[msg.user_id] = user
+    else:
+      user = self.users_by_session[msg.session]
+    user.update(msg)
+    if self.user is None:
+      self.user = user
 
-  def on_crypt_setup(self, key, client, server):
+  def on_text_message(self, msg):
+    self.bot.on_text_message(from_id = msg.actor, user_ids = msg.session,
+                             channel_ids = msg.channel_id,
+                             tree_ids = msg.tree_id,
+                             message = msg.message)
+
+  def on_crypt_setup(self, msg):
     pass
 
-  def on_unknown(self, type, str):
-    LOGGER.warning("Unknown message received: type(%s), '%s'" % (type, str))
+  def on_unknown(self, type, msg):
+    LOGGER.warning("Unknown message received: type(%s), '%s'" % (type, msg))
 
 # The root class of any bots. This provides more utility over connection and
 # keep the bot state. It also builds the BotState for the connection for you,
@@ -127,8 +147,26 @@ class Bot(object):
   def rejected(self):
     self.stop()
 
-  def ready(self):
+  def connected(self):
     pass
+
+  def get_channel_by_id(self, id):
+    return self.state.channels_by_id[id]
+
+  def get_user_by_id(self, id):
+    return self.state.users_by_id[id]
+
+  def get_user_by_name(self, name):
+    for u in self.state.users_by_session:
+      if self.state.users_by_session[u].name == name:
+        return self.state.users_by_session[u]
+    return None
+
+  def get_root(self):
+    return self.state.root
+
+  def is_connected(self):
+    return self.connection is not None
 
   ### EVENTS FROM STATE
   def on_text_message(self, from_id, user_ids, channel_ids, tree_ids, message):
