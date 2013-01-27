@@ -1,4 +1,3 @@
-#!/bin/python
 # A console to be used in cmdline. Automates bots.
 
 import atexit
@@ -27,6 +26,7 @@ class BotDone(Exception):
 class Context(object):
   def __init__(self, bot):
     self.__bot = bot
+    self.__bot_list = []
 
   def ping(self, hostport):
     (version, users, max_users, bandwidth, ping) = (

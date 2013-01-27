@@ -1,4 +1,3 @@
-#!/bin/python
 # Describes the protocol used to communicate with Mumble.
 # This is a series of methods that creates a message to be sent directly
 # to Mumble. It's stateless and is just used for convenience.
@@ -89,6 +88,11 @@ def request_blob(texture = None, comment = None, description = None):
   if description: msg.channel_description.extend(description)
   return serialize_(msg)
 
+def user_stats(session):
+  msg = mumble_pb2.UserStats()
+  msg.session = session
+  return serialize_(msg)
+
 # Analyze Packets.
 def packet_length(header):
   return struct.unpack(HEADER_FORMAT, header)[1]
@@ -97,7 +101,12 @@ def parse(header, msg):
   msgType, length = struct.unpack(HEADER_FORMAT, header)
   msgClass = TYPE_MESSAGE_LOOKUP[msgType]
   message = msgClass()
-  message.ParseFromString(msg)
+  # UDPTunnel are not encapsulated in protobufs, but are just streamed
+  # bytes.
+  if msgType == 1:
+    message.packet = msg
+  else:
+    message.ParseFromString(msg)
   return message
 
 # Decode the session from the varint format

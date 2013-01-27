@@ -1,5 +1,3 @@
-#!/bin/python
-
 from datetime import datetime
 import logging
 import select
@@ -58,6 +56,8 @@ class Connection(threading.Thread):
     self._send(protocol.request_blob(None, [session_id], None))
   def ask_description_for_channel(self, channel_id):
     self._send(protocol.request_blob(None, None, [channel_id]))
+  def ask_stats_for_user(self, session_id):
+    self._send(protocol.user_stats(session_id))
 
   ##############################################################################
   # Private.
@@ -82,17 +82,14 @@ class Connection(threading.Thread):
   def _recv(self):
     # Get the header first.
     try:
-      header = self.socket.recv(protocol.HEADER_SIZE)
+      header = ''
+      while len(header) < protocol.HEADER_SIZE:
+        received = self.socket.recv(protocol.HEADER_SIZE - len(header))
+        header += received
+        if len(received) == 0:
+          return None
     except:
       return None
-    if len(header) == 0:
-      return None
-
-    while len(header) < protocol.HEADER_SIZE:
-      received = self.socket.recv(protocol.HEADER_SIZE - len(header))
-      header += received
-      if len(received) == 0:
-        return None
 
     size = protocol.packet_length(header)
     msg = ""
@@ -113,15 +110,15 @@ class Connection(threading.Thread):
 
   # Call a delegate method named 'attr' for all messages in the
   # voice packet.
-  def _call_voice(self, attr, msg, session, sequence):
+  def _call_voice(self, attr, session, sequence, msg):
     pos = 0
     while ord(msg[pos]) & 0b10000000 != 0:
-      sz = msg[pos] & 0b01111111
-      self._call(attr, sequence, msg[pos:pos + sz])
+      sz = ord(msg[pos]) & 0b01111111
+      self._call(attr, session, sequence, msg[pos:pos + sz])
       pos += sz
     else:
-      sz = msg[pos]
-      self._call(attr, sequence, msg[pos:pos + sz])
+      sz = ord(msg[pos])
+      self._call(attr, session, sequence, msg[pos:pos + sz])
 
   ##############################################################################
   # The different message handlers. These delegate for handling it.
@@ -137,20 +134,22 @@ class Connection(threading.Thread):
     if not self.delegate:
       return
     # This is voice data.
-    type, target, session, sequence, length = protocol.parse_voice_header(msg)
+    type, target, session, sequence, length = (
+        protocol.parse_voice_header(msg.packet))
     if type == 1:
       # Session is the timestamp.
       self._call("on_voice_ping", session)
     else:
       # For each frame, send the frame as is.
       if target == 0:
-        self._call_voice("on_voice_talk", session, sequence, msg[length:])
+        self._call_voice("on_voice_talk", session, sequence,
+                         msg.packet[length:])
       elif target == 1:
         self._call_voice("on_voice_whisper_chan", session, sequence,
-                         msg[length:])
+                         msg.packet[length:])
       elif target == 2:
         self._call_voice("on_voice_whisper_self", session, sequence,
-                         msg[length:])
+                         msg.packet[length:])
       # We can safely ignore the other targets, they are client -> server.
 
   def _on_authenticate(self, msg):
@@ -196,6 +195,9 @@ class Connection(threading.Thread):
     # Start pinging.
     self.ping()
 
+  def _on_user_stats(self, msg):
+    self._call("on_user_stats", mag)
+
   def _on_unknown(self, msg):
     self._call("on_unknown", type(msg), msg)
 
@@ -225,7 +227,7 @@ class Connection(threading.Thread):
       # mumble_pb2.VoiceTarget: self._on_voice_target,
       # mumble_pb2.PermissionQuery: self._on_permission_query,
       # mumble_pb2.CodecVersion: self._on_codec_version,
-      # mumble_pb2.UserStats: self._on_user_stats,
+      mumble_pb2.UserStats: self._on_user_stats,
       # mumble_pb2.SuggestConfig: self._on_suggest_config,
       # mumble_pb2.RequestBlob: self._on_request_blob,
     }.get(type(msg), self._on_unknown)(msg)

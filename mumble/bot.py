@@ -1,5 +1,3 @@
-#!/bin/python
-
 import logging
 
 from channel import Channel
@@ -26,19 +24,35 @@ class BotState(object):
     # The current channel the bot is in.
     self.channel = None
 
+  def get_actor(self, session_id):
+    if not session_id in self.users_by_session:
+      LOGGER.warning('Invalid session ID: %d.' % session_id)
+      return None
+    else:
+      return self.users_by_session(session_id)
+
+  def get_channel(self, chan_id):
+    if not chan_id in self.channels_by_id:
+      LOGGER.warning('Invalid Channel ID: %d.' % chan_id)
+      return None
+    else:
+      return self.channels_by_id[chan_id]
+
   def on_version(self, msg):
     self.version = msg.version
     self.release = msg.release
     self.os = msg.os
     self.os_version = msg.os_version
 
-  # We do not support voice right now.
   def on_voice_ping(self, session_id):
-    pass
+    self.bot.on_voice_ping(session_id)
+
   def on_voice_talk(self, from_id, sequence, data):
-    pass
+    self.bot.on_voice_talk(self.get_actor(from_id), sequence, data)
+
   def on_voice_whisper_chan(self, from_id, sequence, data):
     pass
+
   def on_voice_whisper_self(self, from_id, sequence, data):
     pass
 
@@ -107,13 +121,20 @@ class BotState(object):
       self.user = user
 
   def on_text_message(self, msg):
-    self.bot.on_text_message(from_id = msg.actor, user_ids = msg.session,
-                             channel_ids = msg.channel_id,
+    self.bot.on_text_message(from = self.get_actor(msg.actor),
+                             user_ids = [self.get_actor(x)
+                                 for x in msg.session],
+                             channel_ids = [self.get_channel(x)
+                                 for x in msg.channel_id],
                              tree_ids = msg.tree_id,
                              message = msg.message)
 
   def on_crypt_setup(self, msg):
     pass
+
+  def on_user_stats(self, msg):
+    assert msg.session in self.users_by_session
+    self.users_by_session[msg.session].update_stats(msg)
 
   def on_unknown(self, type, msg):
     LOGGER.warning("Unknown message received: type(%s), '%s'" % (type, msg))
@@ -123,7 +144,7 @@ class BotState(object):
 # so you don't have to (ain't that nice).
 class Bot(object):
   def __init__(self, version = "HansBot"):
-    self.version = "HansBot"
+    self.version = version
     self.state = BotState(self)
     self.connection = None
 
@@ -150,6 +171,12 @@ class Bot(object):
   def connected(self):
     pass
 
+  def channels(self):
+    return self.channels_by_id.values()
+
+  def users(self):
+    return self.users_by_session.values()
+
   def get_channel_by_id(self, id):
     return self.state.channels_by_id[id]
 
@@ -169,26 +196,30 @@ class Bot(object):
     return self.connection is not None
 
   ### EVENTS FROM STATE
-  def on_text_message(self, from_id, user_ids, channel_ids, tree_ids, message):
+  def on_text_message(self, from, user_ids, channel_ids, tree_ids, message):
     if self.state.session_id in user_ids:
-      self.on_message_self(from_id = from_id, message = message)
+      self.on_message_self(from = from, message = message)
     if user_ids:
-      self.on_message_users(from_id = from_id, user_ids = user_ids,
+      self.on_message_users(from = from, user_ids = user_ids,
                             message = message)
     if channel_ids:
-      self.on_message_channels(from_id = from_id, channel_ids = channel_ids,
+      self.on_message_channels(from = from, channel_ids = channel_ids,
                                message = message)
     if tree_ids:
-      self.on_message_trees(from_id = from_id, tree_ids = tree_ids,
+      self.on_message_trees(from = from, tree_ids = tree_ids,
                             message = message)
 
   ### EVENTS
-  def on_message_self(self, from_id, message):
+  def on_message_self(self, from, message):
     pass
-  def on_message_users(self, from_id, user_ids, message):
+  def on_message_users(self, from, user_ids, message):
     pass
-  def on_message_channels(self, from_id, channel_ids, message):
+  def on_message_channels(self, from, channel_ids, message):
     pass
-  def on_message_trees(self, from_id, tree_ids, message):
+  def on_message_trees(self, from, tree_ids, message):
     pass
 
+  def on_voice_ping(self, session_id):
+    pass
+  def on_voice_talk(self, from, sequence, data):
+    pass

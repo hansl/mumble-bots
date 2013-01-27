@@ -31,3 +31,6 @@ class EchoBot(mumble.CommandBot):
   def on_command_text(self, from_id, command, args):
     print "Command '%s'('%s')" % (command, args)
     return True  # Do not echo.
+
+  def on_voice_talk(self, from_id, sequence, data):
+    print "Received voice: %d bytes" % len(data)
