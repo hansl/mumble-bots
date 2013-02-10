@@ -2,7 +2,7 @@
 #
 # Bot that can answers to !... commands.
 # How to use:
-#   Inherits from CommandBot and override on_command.
+#   Inherits from CommandBot and override on_bang.
 #   The rest of the Bot interface remains inchanged.
 #
 # In mumble, you can use the command_prefixes to make a call.
@@ -12,7 +12,7 @@
 #
 # The method will be called with list of arguments in order, containing
 # containing prefix. So for the example above and by default, it will call
-#   CommandBot.on_command(self, '!ban', 'other_user')
+#   CommandBot.on_bang(self, '!ban', 'other_user')
 #
 # Manage that as you will.
 
@@ -27,7 +27,7 @@ LOGGER = logging.getLogger(__name__)
 
 class CommandBot(Bot):
   DEFAULT_PREFIXES = {
-    '!': 'on_command',
+    '!': 'on_bang',
   }
 
   def __init__(self, command_prefixes = CommandBot.DEFAULT_PREFIXES,
@@ -45,5 +45,5 @@ class CommandBot(Bot):
           return
     Bot.on_text_message(self, from, user_ids, channel_ids, tree_ids, message)
 
-  def on_command(self, from, *args):
+  def on_bang(self, from, *args):
     pass

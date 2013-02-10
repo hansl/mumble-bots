@@ -26,8 +26,8 @@ class AdvanceBot(CommandBot):
   """
 
   PREFIXES = {
-    '!': 'on_command_bang',
-    '/': 'on_command_slash',
+    '!': 'on_bang',
+    '/': 'on_slash',
   }
 
   def __init__(self, config_path = None, name = 'AdvanceBot by HansL'):
@@ -49,16 +49,22 @@ class AdvanceBot(CommandBot):
     if self.__config_path: self.save_config(self.__config_path)
 
   def load_config(self, path):
-    """Reload the config (overriding it) from path."""
+    """Reload the config (overriding it) from path.
+
+      Arguments: path The path of the config to load (does not force save later.
+    """
     with open(path, 'r') as fin:
       (self.var, self.rights, self.all_rights) = pickle.load(fin)
 
   def save_config(self, path):
-    """Save the full config, except session data, to path."""
+    """Save the full config, except session data, to path.
+
+      Arguments: path The path of the config to save to.
+    """
     with open(path, 'w') as fout:
       pickle.dump((self.var, self.rights, self.all_rights), fout)
 
-  def check_rights(self, from, command):
+  def has_rights(self, from, command):
     """Returns true if the command is available for the specified user."""
     if from.id is None:
       if from.session in self.__session_rights:
@@ -77,6 +83,7 @@ class AdvanceBot(CommandBot):
     self.send_message(from, '\'%s\' = \'%s\'' % (name, self.var[name]))
 
   def on_command_get(self, from, name, *_):
+    """Get the value of a local variable."""
     self.send_message(from, '\'%s\' = \'%s\'' % (name, self.var[name]))
 
   def on_command_add_right(self, from, name, command, *_):
@@ -85,20 +92,36 @@ class AdvanceBot(CommandBot):
       self.send_message(from, 'User not found: \'%s\'' % name)
     if target.id is None:
       if not target.session in self.__session_rights:
-        self.__session_rights[target.session] = [command]
-      else:
-
+        self.__session_rights[target.session] = Set()
+      self.__session.rights[target.session].insert(command)
       self.send_message(from, 'Temporarily set right for user.')
     else:
       if from.id not in self.rights:
+        self.rights[from.id] = Set()
+      self.rights[from.id].insert(command)
+      self.send_message(from, 'Permanently set right for user.')
 
+  def on_command_list_commands(self, from, *_):
+    """List all commands supported by this bot."""
+    commands = filter(lambda x: x.startswith('on_command_'),
+                      self.__dict__.keys())
+    
 
-  def on_command_slash(self, from, command, kargs):
-    if self.check_rights(from, command):
+  def on_command_help(self, from, command=None, *_):
+    """Provides help for functions.
+       Use /help [command] to get the documentation of a particular command."""
+    func = getattr(self, 'command_%s' % command, None)
+    if func:
+      self.send_message(from, 'Command \'%s\':\n%s' % (command, func.__doc__))
+    else:
+      self.send_message(from, 'Command \'%s\' not supported.' % command)
+
+  def on_slash(self, from, command, kargs):
+    if self.has_rights(from, command):
       func = getattr(self, 'command_%s' % command, None)
       if func:
         func(from, *kargs)
     return True
 
-  def on_command_bang(self, from, command, args):
+  def on_bang(self, from, command, args):
     return False
