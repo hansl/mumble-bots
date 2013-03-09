@@ -72,7 +72,6 @@ class BotState(object):
     self.allow_html = msg.allow_html
 
   def on_server_sync(self, msg):
-    self.session_id = msg.session
     self.max_bandwidth = msg.max_bandwidth
     self.welcome_text = msg.welcome_text
     if msg.permissions:
@@ -106,7 +105,6 @@ class BotState(object):
         LOGGER.error('Parent ID passed by server is not in the channel list.')
         raise Exception('Invalid Parent.')
       self.channels_by_id[msg.parent].add_child(chan)
-    print msg
 
   def on_user_state(self, msg):
     if msg.session not in self.users_by_session:
@@ -195,6 +193,7 @@ class Bot(object):
   def is_connected(self):
     return self.connection is not None
 
+  ##############################################################################
   ### EVENTS FROM STATE
   def on_text_message(self, from, user_ids, channel_ids, tree_ids, message):
     if self.state.session_id in user_ids:
@@ -209,6 +208,12 @@ class Bot(object):
       self.on_message_trees(from = from, tree_ids = tree_ids,
                             message = message)
 
+  def on_voice_ping(self, session_id):
+    pass
+  def on_voice_talk(self, from, sequence, data):
+    pass
+
+  ##############################################################################
   ### EVENTS
   def on_message_self(self, from, message):
     pass
@@ -217,9 +222,4 @@ class Bot(object):
   def on_message_channels(self, from, channel_ids, message):
     pass
   def on_message_trees(self, from, tree_ids, message):
-    pass
-
-  def on_voice_ping(self, session_id):
-    pass
-  def on_voice_talk(self, from, sequence, data):
     pass
