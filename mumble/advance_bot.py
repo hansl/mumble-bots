@@ -29,6 +29,7 @@ class AdvanceBot(CommandBot):
     '!': 'on_bang',
     '/': 'on_slash',
   }
+  DATA_VERSION = 0
 
   def __init__(self, config_path = None, name = 'AdvanceBot by HansL'):
     """
@@ -54,7 +55,11 @@ class AdvanceBot(CommandBot):
       Arguments: path The path of the config to load (does not force save later.
     """
     with open(path, 'r') as fin:
-      (self.var, self.rights, self.all_rights) = pickle.load(fin)
+      data = pickle.load(fin)
+      if (data['version'] >= 0):
+        self.var = data['var']
+        self.rights = data['rights']
+        self.all_rights = data['all_rights']
 
   def save_config(self, path):
     """Save the full config, except session data, to path.
@@ -62,7 +67,12 @@ class AdvanceBot(CommandBot):
       Arguments: path The path of the config to save to.
     """
     with open(path, 'w') as fout:
-      pickle.dump((self.var, self.rights, self.all_rights), fout)
+      pickle.dump({
+        version: AdvanceBot.DATA_VERSION,
+        var: self.var,
+        rights: self.rights,
+        all_rights: self.all_rights,
+      }, fout)
 
   def has_rights(self, from, command):
     """Returns true if the command is available for the specified user."""
