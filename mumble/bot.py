@@ -29,7 +29,7 @@ class BotState(object):
       LOGGER.warning('Invalid session ID: %d.' % session_id)
       return None
     else:
-      return self.users_by_session(session_id)
+      return self.users_by_session[session_id]
 
   def get_channel(self, chan_id):
     if not chan_id in self.channels_by_id:
@@ -119,13 +119,13 @@ class BotState(object):
       self.user = user
 
   def on_text_message(self, msg):
-    self.bot.on_text_message(from = self.get_actor(msg.actor),
-                             user_ids = [self.get_actor(x)
+    self.bot.on_text_message(from_user = self.get_actor(msg.actor),
+                             to_users = [self.get_actor(x)
                                  for x in msg.session],
-                             channel_ids = [self.get_channel(x)
+                             to_channels = [self.get_channel(x)
                                  for x in msg.channel_id],
                              tree_ids = msg.tree_id,
-                             message = msg.message)
+                             message = "%s" % msg.message)
 
   def on_crypt_setup(self, msg):
     pass
@@ -195,31 +195,32 @@ class Bot(object):
 
   ##############################################################################
   ### EVENTS FROM STATE
-  def on_text_message(self, from, user_ids, channel_ids, tree_ids, message):
-    if self.state.session_id in user_ids:
-      self.on_message_self(from = from, message = message)
-    if user_ids:
-      self.on_message_users(from = from, user_ids = user_ids,
+  def on_text_message(self, from_user, to_users, to_channels, tree_ids,
+                      message):
+    if self.state.user.session in to_users:
+      self.on_message_self(from_user = from_user, message = message)
+    if to_users:
+      self.on_message_users(from_user = from_user, to_users = to_users,
                             message = message)
-    if channel_ids:
-      self.on_message_channels(from = from, channel_ids = channel_ids,
+    if to_channels:
+      self.on_message_channels(from_user = from_user, to_channels = to_channels,
                                message = message)
     if tree_ids:
-      self.on_message_trees(from = from, tree_ids = tree_ids,
+      self.on_message_trees(from_user = from_user, tree_ids = tree_ids,
                             message = message)
 
   def on_voice_ping(self, session_id):
     pass
-  def on_voice_talk(self, from, sequence, data):
+  def on_voice_talk(self, from_user, sequence, data):
     pass
 
   ##############################################################################
   ### EVENTS
-  def on_message_self(self, from, message):
+  def on_message_self(self, from_user, message):
     pass
-  def on_message_users(self, from, user_ids, message):
+  def on_message_users(self, from_user, to_users, message):
     pass
-  def on_message_channels(self, from, channel_ids, message):
+  def on_message_channels(self, from_user, to_channels, message):
     pass
-  def on_message_trees(self, from, tree_ids, message):
+  def on_message_trees(self, from_user, tree_ids, message):
     pass

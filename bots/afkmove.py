@@ -12,10 +12,11 @@ import mumble
 class WatchDogThread(threading.Thread):
   def __init__(self, bot):
     threading.Thread.__init__(self)
+    self.keep_going = True
     self.__bot = bot
 
   def run(self):
-    while True:
+    while self.keep_going:
       # Sleep 30 seconds.
       time.sleep(30)
       if self.bot.args['max_idle'] == 0:
@@ -36,6 +37,8 @@ class AfkMoveBot(mumble.CommandBot):
     }
 
   def connected(self):
-    self.tr = WatchDogThread(self)
-    tr.run()
+    self.thread = WatchDogThread(self)
+    self.thread.run()
 
+  def stopping(self):
+    self.thread.keep_going = False

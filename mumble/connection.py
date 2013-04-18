@@ -196,7 +196,7 @@ class Connection(threading.Thread):
     self.ping()
 
   def _on_user_stats(self, msg):
-    self._call("on_user_stats", mag)
+    self._call("on_user_stats", msg)
 
   def _on_unknown(self, msg):
     self._call("on_unknown", type(msg), msg)

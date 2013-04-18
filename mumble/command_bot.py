@@ -31,30 +31,33 @@ class CommandBot(Bot):
   }
   CHAN_DEFAULT_PREFIXES = {}
 
-  def __init__(self, command_prefixes = CommandBot.TO.DEFAULT_PREFIXES,
-                     channel_command_prefixes =
-                         CommandBot.CHAN_DEFAULT_PREFIXES,
+  def __init__(self, command_prefixes = TO_DEFAULT_PREFIXES,
+                     channel_command_prefixes = CHAN_DEFAULT_PREFIXES,
                      name = "CommandBot by HansL"):
-    Bot.__init__(self, name = name)
+    Bot.__init__(self, name)
     self.__prefixes = command_prefixes
     self.__channel_prefixes = channel_command_prefixes
 
-  def on_text_message(self, from, user_ids, channel_ids, tree_ids, message):
+  def on_text_message(self, from_user, to_users, to_channels, tree_ids, message):
     # Only answer to direct messages, not channel messages.
-    if self.state.user.id in user_ids:
-      cmd = shlex.split(m.group(1))
+    cmd = shlex.split(message)
+    if self.state.user in to_users:
       for p in self.__prefixes.keys():
         if cmd[0].startswith(p):
-          func = getattr(self, __prefixes[p])
-          func(self, from = from, *cmd)
+          cmd[0] = cmd[0][len(p):]
+          func = getattr(self, self.__prefixes[p])
+          func(from_user, *cmd)
           return
-    if self.state.channel.id in channel_ids:
+    if self.state.channel in to_channels:
       for p in self.__channel_prefixes.keys():
         if cmd[0].startswith(p):
+          cmd[0] = cmd[0][len(p):]
           func = getattr(self, self.__channel_prefixes[p])
-          func(self, from = from, *cmd)
+          func(from_user, *cmd)
           return
-    Bot.on_text_message(self, from, user_ids, channel_ids, tree_ids, message)
 
-  def on_bang(self, from, *args):
+    Bot.on_text_message(self, from_user, to_users, to_channels, tree_ids,
+                        message)
+
+  def on_bang(self, from_user, *args):
     pass
