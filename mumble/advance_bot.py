@@ -39,7 +39,7 @@ class AdvanceBot(CommandBot):
     """
     CommandBot.__init__(self, command_prefixes = AdvanceBot.PREFIXES,
                               name = name)
-    self.var = {}
+    self.vars = {}
     self.rights = {}
     self.all_rights = []  # Rights by everyone
     # These are never serialized because sessions vary from login/logout.
@@ -60,7 +60,7 @@ class AdvanceBot(CommandBot):
     with open(path, 'r') as fin:
       data = pickle.load(fin)
       if (data['version'] >= 0):
-        self.var = data['var']
+        self.vars = data['vars']
         self.rights = data['rights']
         self.all_rights = data['all_rights']
 
@@ -71,10 +71,10 @@ class AdvanceBot(CommandBot):
     """
     with open(path, 'w') as fout:
       pickle.dump({
-        version: AdvanceBot.DATA_VERSION,
-        var: self.var,
-        rights: self.rights,
-        all_rights: self.all_rights,
+        'version': AdvanceBot.DATA_VERSION,
+        'vars': self.vars,
+        'rights': self.rights,
+        'all_rights': self.all_rights,
       }, fout)
 
   def has_rights(self, from_user, command):
@@ -92,19 +92,19 @@ class AdvanceBot(CommandBot):
 
   def on_command_set(self, from_user, name, value, *_):
     """Set a local variable."""
-    self.var[name] = value
-    self.send_message(from_user, '\'%s\' = \'%s\'' % (name, self.var[name]))
+    self.vars[name] = value
+    self.send_message(from_user, '\'%s\' = \'%s\'' % (name, self.vars[name]))
 
   def on_command_get(self, from_user, name, *_):
     """Get the value of a local variable."""
-    if name in self.var:
-      self.send_message(from_user, '\'%s\' = \'%s\'' % (name, self.var[name]))
+    if name in self.vars:
+      self.send_message(from_user, '\'%s\' = \'%s\'' % (name, self.vars[name]))
     else:
       self.send_message(from_user, '\'%s\' doesn\'t exist.' % (
           name))
 
   def on_command_list_var(self, from_user, *_):
-    self.send_message(from_user, 'Vars: %s' % self.var.keys())
+    self.send_message(from_user, 'Vars: %s' % self.vars.keys())
 
   def on_command_add_right(self, from_user, name, command, *_):
     target = self.get_user_by_name(name)

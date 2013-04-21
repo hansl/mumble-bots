@@ -14,7 +14,7 @@ import sys
 class UserMoveBot(mumble.AdvanceBot):
   def __init__(self, name = "EchoBot by HansL"):
     mumble.AdvanceBot.__init__(self, name = name)
-    self.var = {'channel_id': 0}
+    self.vars = {'channel_id': 0}
     self.all_rights = ['get', 'set', 'moveall', 'list_var']
 
   def stopping(self):
@@ -22,7 +22,7 @@ class UserMoveBot(mumble.AdvanceBot):
 
   def on_command_moveall(self, *_):
     for user in self.users():
-      user.move_to(self.get_channel_by_id(self.var["channel_id"]))
+      user.move_to(self.get_channel_by_id(self.vars["channel_id"]))
 
 if __name__ == '__main__':
   # Start the bot

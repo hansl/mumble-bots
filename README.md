@@ -54,7 +54,7 @@ A bot that eavesdrop on a channel and replays it to another channel, potentially
 
       def on_command_moveall(self, *):
         for user in self.users():
-          user.move_to(self.get_channel_by_id(self.var["channel_id"]))
+          user.move_to(self.get_channel_by_id(self.vars["channel_id"]))
 
 	if __name__ == '__main__':
 	  # Start the bot
