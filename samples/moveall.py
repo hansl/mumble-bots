@@ -15,7 +15,7 @@ class UserMoveBot(mumble.AdvanceBot):
   def __init__(self, name = "EchoBot by HansL"):
     mumble.AdvanceBot.__init__(self, name = name)
     self.vars = {'channel_id': 0}
-    self.all_rights = ['get', 'set', 'moveall', 'list_var']
+    self.all_rights = ['get', 'set', 'moveall', 'list_var', 'leave']
 
   def stopping(self):
     self.thread.keep_going = False
@@ -24,8 +24,11 @@ class UserMoveBot(mumble.AdvanceBot):
     for user in self.users():
       user.move_to(self.get_channel_by_id(self.vars["channel_id"]))
 
+  def on_command_leave(self, *_):
+    self.stop()
+
 if __name__ == '__main__':
   # Start the bot
   bot = UserMoveBot()
   bot.start(mumble.Server(sys.argv[1], sys.argv[2]), "-Bot-")
-  bot.join()
+  bot.join()  # This will wait until the bot is kicked or leave.
