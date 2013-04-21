@@ -79,7 +79,6 @@ class AdvanceBot(CommandBot):
 
   def has_rights(self, from_user, command):
     """Returns true if the command is available for the specified user."""
-    print "command: %s" % command
     if from_user.id is None:
       if from_user.session in self.__session_rights:
         return command in self.__session_rights[from_user.session]
@@ -89,8 +88,6 @@ class AdvanceBot(CommandBot):
     if from_user.is_superuser:
       # Superuser can do everything, except if you specifically block him above.
       return True
-    print "Command '%s' in all rights (%s)? %s" % (
-        command, self.all_rights, command in self.all_rights)
     return command in self.all_rights
 
   def on_command_set(self, from_user, name, value, *_):
@@ -100,7 +97,14 @@ class AdvanceBot(CommandBot):
 
   def on_command_get(self, from_user, name, *_):
     """Get the value of a local variable."""
-    self.send_message(from_user, '\'%s\' = \'%s\'' % (name, self.var[name]))
+    if name in self.var:
+      self.send_message(from_user, '\'%s\' = \'%s\'' % (name, self.var[name]))
+    else:
+      self.send_message(from_user, '\'%s\' doesn\'t exist.' % (
+          name))
+
+  def on_command_list_var(self, from_user, *_):
+    self.send_message(from_user, 'Vars: %s' % self.var.keys())
 
   def on_command_add_right(self, from_user, name, command, *_):
     target = self.get_user_by_name(name)
@@ -121,12 +125,12 @@ class AdvanceBot(CommandBot):
     """List all commands supported by this bot."""
     commands = filter(lambda x: x.startswith('on_command_'),
                       self.__dict__.keys())
-    
+    self.send_message(from_user, 'Commands supported: %s' % commands)
 
   def on_command_help(self, from_user, command=None, *_):
     """Provides help for functions.
        Use /help [command] to get the documentation of a particular command."""
-    func = getattr(self, 'command_%s' % command, None)
+    func = getattr(self, 'on_command_%s' % command, None)
     if func:
       self.send_message(from_user, 'Command \'%s\':\n%s' % (command, func.__doc__))
     else:
@@ -134,9 +138,14 @@ class AdvanceBot(CommandBot):
 
   def on_slash(self, from_user, command, *args):
     if self.has_rights(from_user, command):
-      func = getattr(self, 'command_%s' % command, None)
+      func = getattr(self, 'on_command_%s' % command, None)
       if func:
-        func(from_user, *kargs)
+        try:
+          func(from_user, *args)
+        except Exception, err:
+          self.send_message(from_user, 'Exception: %s' % err)
+      else:
+        self.send_message(from_user, 'Unknown command: \'%s\'' % command)
     return True
 
   def on_bang(self, from_user, command, *args):

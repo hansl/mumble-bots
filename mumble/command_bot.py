@@ -40,7 +40,7 @@ class CommandBot(Bot):
 
   def on_text_message(self, from_user, to_users, to_channels, tree_ids, message):
     # Only answer to direct messages, not channel messages.
-    cmd = shlex.split(message)
+    cmd = shlex.split(message.encode('ascii', 'ignore'))
     if self.state.user in to_users:
       for p in self.__prefixes.keys():
         if cmd[0].startswith(p):

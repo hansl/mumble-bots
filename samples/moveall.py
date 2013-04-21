@@ -14,8 +14,8 @@ import sys
 class UserMoveBot(mumble.AdvanceBot):
   def __init__(self, name = "EchoBot by HansL"):
     mumble.AdvanceBot.__init__(self, name = name)
-    self.args = {'channel_id': 0}
-    self.all_rights = ['get', 'set', 'moveall']
+    self.var = {'channel_id': 0}
+    self.all_rights = ['get', 'set', 'moveall', 'list_var']
 
   def stopping(self):
     self.thread.keep_going = False

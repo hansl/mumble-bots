@@ -156,8 +156,8 @@ class Bot(object):
   def join(self):
     self.connection.join()
 
-  def send_message(self, destination, message):
-    self.connection.send_message(destination = destination, message = message)
+  def send_message(self, user, message):
+    self.connection.send_message(destination = user.session, message = message)
 
   def stop(self):
     self.connection.stop()
@@ -170,10 +170,10 @@ class Bot(object):
     pass
 
   def channels(self):
-    return self.channels_by_id.values()
+    return self.state.channels_by_id.values()
 
   def users(self):
-    return self.users_by_session.values()
+    return self.state.users_by_session.values()
 
   def get_channel_by_id(self, id):
     return self.state.channels_by_id[id]
