@@ -6,13 +6,13 @@
 # Or the channel name with /set channel_name "the name"
 # You can manage the rights of this bot by sending it the
 # /add_right message, e.g. /add_right UserName moveall
-# or /remove_right.
+# or /remove_right UserName moveall.
 import mumble
 
 import sys
 
 class UserMoveBot(mumble.AdvanceBot):
-  def __init__(self, name = "EchoBot by HansL"):
+  def __init__(self, name = "UserMove by HansL"):
     mumble.AdvanceBot.__init__(self, name = name)
     self.vars = {'channel_id': 0}
     self.all_rights = ['get', 'set', 'moveall', 'list_var', 'leave']
@@ -23,9 +23,6 @@ class UserMoveBot(mumble.AdvanceBot):
   def on_command_moveall(self, *_):
     for user in self.users():
       user.move_to(self.get_channel_by_id(self.vars["channel_id"]))
-
-  def on_command_leave(self, *_):
-    self.stop()
 
 if __name__ == '__main__':
   # Start the bot

@@ -90,6 +90,9 @@ class AdvanceBot(CommandBot):
       return True
     return command in self.all_rights
 
+  def on_command_leave(self, *_):
+    self.stop()
+
   def on_command_set(self, from_user, name, value, *_):
     """Set a local variable."""
     self.vars[name] = value
@@ -114,12 +117,16 @@ class AdvanceBot(CommandBot):
       if not target.session in self.__session_rights:
         self.__session_rights[target.session] = Set()
       self.__session.rights[target.session].insert(command)
-      self.send_message(from_user, 'Temporarily set right for user.')
+      self.send_message(from_user,
+                        'Permanently set right for command "%s" for session.' %
+                            command)
     else:
       if from_user.id not in self.rights:
         self.rights[from_user.id] = Set()
       self.rights[from_user.id].insert(command)
-      self.send_message(from_user, 'Permanently set right for user.')
+      self.send_message(from_user,
+                        'Permanently set right for command "%s" for user.' % (
+                            command))
 
   def on_command_list_commands(self, from_user, *_):
     """List all commands supported by this bot."""
