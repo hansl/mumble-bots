@@ -205,8 +205,9 @@ class InteractiveBot(mumble.Bot):
   def interact(self):
     self.done = False
     self.motd()
-    for line in self.rc:
-      self.parse_and_execute(line)
+    if self.rc:
+      for line in self.rc:
+        self.parse_and_execute(line)
 
     while not self.done:
       try:
